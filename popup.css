@@ -1,0 +1,71 @@
+body {
+    width: 360px;
+    height: 240px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 10px;
+
+    color: #e1e1db;
+    background-color: #181818;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+}
+div,
+button {
+    font-family: inherit;
+}
+
+.ext-h2 {
+    color: #598bdd;
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+#ext-closePopupBtn {
+    position: absolute;
+    top: 1.0rem;
+    right: 0.5rem;
+    width: 40px;
+    height: 32px;
+    cursor: pointer;
+}
+#ext-loadingSpinner {
+    width: 60px;
+    height: 60px;
+    display: none;
+}
+
+button {
+    margin: 10px 0;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    background: #004182;
+    color: #e1e1db;
+    font-size: 1.12em;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: none;
+}
+button:hover {
+    background-color: #3071b2;
+}
+.ext-buttonRow {
+    display: flex;
+    align-items: center;
+}
+
+#ext-status {
+    margin-top: 10px;
+    font-size: 1.08em;
+}
+.ext-status--error {
+    color: #f55;
+}
+.ext-status--warning {
+    color: #cc9;
+    font-weight: bold;
+    font-style: italic;
+}
