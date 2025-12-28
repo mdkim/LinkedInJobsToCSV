@@ -1,0 +1,154 @@
+# Code Style & Architecture Principles
+
+## Error Handling Philosophy
+- **Fail-fast approach**: Let errors propagate up the call stack
+- Use try-catch only at architectural boundaries (main entry points, user interaction handlers)
+- Always provide user feedback via `sendStatusToPopup()` before re-throwing
+- Never silently swallow exceptions
+- Throw meaningful errors with context: `throw new Error('Card ${idx}: Invalid saved job link')`
+- No defensive "muddle through" logic when encountering unexpected states
+
+## Code Organization & Architecture
+- **IIFE wrapping**: Use `(() => { ... })()` for all injected content scripts to avoid polluting global namespace
+- **Separation of concerns**: 
+  - UI logic lives in `popup.js`
+  - Business/extraction logic lives in separate files (`exportToCSV.js`)
+  - No business logic in UI handlers
+- **Single Responsibility Principle**: Each function does one thing well
+- **Keep functions small**: Aim for < 30 lines per function
+- **Module-level state**: Declare state variables at top of module with clear purpose
+
+## Configuration Management
+- **Centralize all magic numbers** in a `CONFIG` object at the top of each file
+- Config should include:
+  - `DEBUG` flag for logging
+  - Timeouts and wait times
+  - Limits (max pages, max retries)
+  - Any tunable parameters
+- No hardcoded values scattered through code
+- Example:
+  ```javascript
+  const CONFIG = {
+      DEBUG: true,
+      PAGE_CHANGE_WAIT_MS: 300,
+      PAGE_LOAD_TIMEOUT_MS: 10000,
+      MAX_PAGES: 50
+  };
+  ```
+
+## Naming Conventions
+- **Be descriptive over terse**: `jobTitleLink` not `titleLink`, `jobNumber` not `index`
+- **UI element IDs**: Prefix with `ext-` (e.g., `ext-status`, `ext-export`)
+- **Functions**:
+  - Action functions: verb-noun format (`extractJobs`, `waitForPageChange`)
+  - Boolean functions: `is*` or `has*` prefix (`isLastPage`, `hasNewContent`)
+  - Debug logging: Use `debug()` not `log()`
+- **Variables**:
+  - `const` by default
+  - `let` only when mutation is required
+  - Descriptive pluralization: `allJobLinks` not `jobLinks` when it's a collection
+- **Constants**: UPPER_SNAKE_CASE for true constants
+
+## Control Flow & Code Structure
+- **Minimize nesting**: Use guard clauses and early returns
+  ```javascript
+  // Good
+  if (!titleLink) {
+      throw new Error('No link found');
+  }
+  // ... rest of logic at main indent level
+  
+  // Avoid
+  if (titleLink) {
+      // ... deeply nested logic
+  }
+  ```
+- **Loop selection**:
+  - `for` loops when iterating a known range
+  - `forEach` for simple iterations
+  - `map`/`filter`/`reduce` when transforming data
+  - `while` only when termination condition is complex
+- **Start counters at 0**: More conventional, aligns with array indexing
+- **Array methods over manual loops**: Prefer functional approach when it improves clarity
+
+## State Management
+- Declare state variables at module scope with clear initialization
+- Use meaningful names that indicate scope: `pageNum`, `jobNum`, `allJobs`
+- Initialize to appropriate zero values (`0` for numbers, `[]` for arrays)
+- Document state transitions in comments when non-obvious
+
+## Input Validation & Defensive Programming
+- **Validate at boundaries**: Check inputs at function entry points
+- **Strict validation**: 
+  - URL checks should verify full path, not just domain
+  - Check array lengths before accessing indices
+  - Validate type and structure of external data
+- **Fail immediately on invalid input**: Don't attempt to "fix" bad data
+- **Meaningful error messages**: Include context about what was expected vs. received
+
+## Asynchronous Code
+- Use `async/await` over Promise chains for readability
+- Always handle promise rejections
+- Use `Promise.all()` for parallel operations when appropriate
+- Keep async functions focused and small
+
+## DOM Interaction (Chrome Extensions)
+- **Query selectors**: Use specific, stable selectors when possible
+- **Avoid obfuscated classes**: Prefer semantic selectors (`[role="list"]`) over generated class names
+- **Cache DOM queries** when the same element is accessed multiple times in a function
+- **Handle null results**: Always check if `querySelector` returned an element
+- **Use `innerText` over `textContent`**: When you want rendered, user-visible text
+
+## Chrome Extension Patterns
+- **Script injection**: Use `files:` parameter for non-trivial scripts, not `func:`
+- **Messaging**: 
+  - Use `chrome.runtime.sendMessage()` for content script → popup communication
+  - Include `type` field for message categorization
+  - Handle `chrome.runtime.lastError` in callbacks
+- **Permissions**: Request minimal necessary permissions
+- **Error boundaries**: Wrap executeScript callbacks in try-catch
+
+## Comments & Documentation
+- **When to comment**:
+  - Complex algorithms or non-obvious logic
+  - TODOs for acknowledged future improvements
+  - "Why" decisions that aren't obvious from code
+- **When NOT to comment**:
+  - Obvious code (`// increment counter`)
+  - Restating function names
+  - Outdated comments
+- **Remove dead code immediately**: No commented-out blocks unless temporarily debugging
+
+## Code Cleanup
+- Delete unused variables, functions, and imports
+- Remove console.logs before committing (except debug logs controlled by CONFIG.DEBUG)
+- No commented-out code in commits
+- Keep codebase minimal and intentional
+- Run through mental checklist: "Is every line here necessary?"
+
+## Testing & Debugging Considerations
+- Include `debugger;` statements during development (remove before commit)
+- Use browser DevTools on the injected page, not extension popup
+- Test edge cases: empty results, network failures, slow connections
+- Use Chrome DevTools Network throttling to test slow connections
+
+## Performance Considerations
+- Don't prematurely optimize
+- Querying 10-100 DOM elements is negligible, don't over-engineer
+- Await only what needs to be sequential
+- Prefer clarity over micro-optimizations
+
+## Consistency
+- Follow existing patterns in the codebase
+- If you introduce a new pattern, apply it consistently throughout
+- Match brace style, indentation, and spacing of existing code
+- Use the same terminology across files (don't mix "job" and "posting")
+
+## Code Review Checklist
+Before committing, ask:
+1. Does this fail-fast or suppress errors?
+2. Are all magic numbers in CONFIG?
+3. Are variable names descriptive?
+4. Is nesting minimized?
+5. Is dead code removed?
+6. Would this be obvious to someone else in 6 months?

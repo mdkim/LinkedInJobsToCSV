@@ -31,7 +31,6 @@ async function main() {
 }
 
 function sendStatusToPopup(msg, type) {
-    //if (!type) type = 'info';
     chrome.runtime.sendMessage({
         type: type,
         message: msg
