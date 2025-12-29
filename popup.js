@@ -21,6 +21,7 @@ function setStatus(msg, type) {
             break;
     }
     extStatus.textContent = msg;
+    extStatus.style.display = 'block';
 }
 
 async function handleExportClick() {

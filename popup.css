@@ -3,7 +3,7 @@ body {
     height: 240px;
     box-sizing: border-box;
     margin: 0;
-    padding: 10px;
+    padding: 0;
 
     color: #e1e1db;
     background-color: #181818;
@@ -13,6 +13,9 @@ body {
 div,
 button {
     font-family: inherit;
+}
+div.ext-main {
+    padding: 18px;
 }
 
 .ext-h2 {
@@ -58,14 +61,33 @@ button:hover {
 }
 
 #ext-status {
-    margin-top: 24px;
-    font-size: 1.08em;
+    padding: 8px 18px;
+    border-top: 1px solid #999;
+    border-bottom: 1px solid #999;
+    background-color: #333;
+    display: none;
+}
+#ext-status::before {
+  content: "";
+  display: inline-block;
+  background-size: contain;
+  background-repeat: no-repeat;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -0.2em;
 }
 .ext-status--error {
     color: #f55;
+}
+.ext-status--error::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23d32f2f' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z'/%3E%3C/svg%3E");
 }
 .ext-status--warning {
     color: #cc9;
     font-weight: bold;
     font-style: italic;
+}
+.ext-status--warning::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23FDC674' viewBox='0 0 24 24'%3E%3Cpath d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/%3E%3C/svg%3E");
 }
