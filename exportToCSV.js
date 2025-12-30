@@ -3,8 +3,8 @@
 
 const CONFIG = {
     DEBUG: true,
-    PAGE_CHANGE_WAIT_MS: 300,
-    PAGE_LOAD_TIMEOUT_MS: 10000,
+    PAGE_CHANGE_WAIT_MS: 150,
+    PAGE_LOAD_TIMEOUT_MS: 3000,
     MAX_PAGES: 50
 };
 
@@ -56,7 +56,7 @@ async function mainExport() {
 
         const nextButton = document.querySelector('button.artdeco-pagination__button--next:not([disabled])');
         if (!nextButton) {
-            debug("No enabled next button found, ending pagination");
+            debug("No enabled 'Next' button found, ending pagination");
             break;
         }
 
@@ -67,13 +67,13 @@ async function mainExport() {
                 return link?.href || '';
             }).filter(Boolean)
         );
-        debug(`Current page has ${currentUrls.size} saved job URLs tracked`);
+        debug(`Current page has ${currentUrls.size} saved job URLs`);
 
         nextButton.click();
 
         try {
-            await waitForPageChange(currentUrls);
-            debug("Page change detected");
+            await waitForNextButton();
+            debug("'Next' button found");
         } catch (err) {
             sendStatusToPopup(`ERROR waiting for page change: ${err.message}`, 'error');
             throw err;
@@ -83,7 +83,7 @@ async function mainExport() {
         debug(`Reached safety limit of ${CONFIG.MAX_PAGES} pages`);
     }
     
-    debug(`Extraction complete. Total jobs: ${allJobs.length}`);
+    debug(`Extract done. Total jobs: ${allJobs.length}`);
     return allJobs;
 }
 
@@ -149,30 +149,26 @@ function extractJobs() {
     return jobs;
 }
 
-async function waitForPageChange(oldUrls, maxWait = CONFIG.PAGE_LOAD_TIMEOUT_MS) {
+async function waitForNextButton(maxWait = CONFIG.PAGE_LOAD_TIMEOUT_MS) {
+    const sleep = () => new Promise(resolve => setTimeout(resolve, CONFIG.PAGE_CHANGE_WAIT_MS));
+    const getPageState = () => document.querySelector('.artdeco-pagination__page-state')?.textContent.trim();
+    const oldPageState = getPageState();
+
     const startTime = Date.now();
-
-    // TODO: how about just checking for existence of Next button
     while (Date.now() - startTime < maxWait) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        const currPageState = getPageState();
+        if (currPageState && currPageState === oldPageState) {
+            debug(`Still on same page '${oldPageState}', waiting ${CONFIG.PAGE_CHANGE_WAIT_MS}ms...`);
+            await sleep();
+            continue;
+        }
 
-        const currentCards = Array.from(document.querySelectorAll('ul[role="list"] > li'));
-        const newUrls = new Set(
-            currentCards.map(card => {
-                // DOM has changed since extractJobs()
-                const allLinks = card.querySelectorAll('a[href*="/jobs/view/"]');
-                const link = allLinks.length > 1 ? allLinks[1] : allLinks[0];
-                return link?.href || '';
-            }).filter(Boolean)
-        );
-
-        const hasNewContent = Array.from(newUrls).some(url => !oldUrls.has(url));
-
-        if (hasNewContent && newUrls.size > 0) {
-            debug(`Page changed detected (${newUrls.size} saved job URLs now present)`);
-            await new Promise(resolve => setTimeout(resolve, CONFIG.PAGE_CHANGE_WAIT_MS));
+        const nextButton = document.querySelector('button.artdeco-pagination__button--next');
+        if (nextButton) {
             return;
         }
+        debug(`'Next' button not found, waiting ${CONFIG.PAGE_CHANGE_WAIT_MS}ms...`);
+        await sleep();
     }
 
     throw new Error("Page load timeout");
@@ -182,9 +178,9 @@ function convertToCSV(jobs) {
     const headers = ['Index', 'Title', 'Company', 'Location', 'URL'];
     const rows = jobs.map(job => [
         escapeCSV(job.jobNumber),
-        escapeCSV(job.title),
         escapeCSV(job.company),
         escapeCSV(job.location),
+        escapeCSV(job.title),
         escapeCSV(job.url)
     ]);
 
