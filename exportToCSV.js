@@ -131,21 +131,24 @@ function extractJobs() {
         });
 
         const comopanySlug = getCompanySlug(card, companyText);
-        const companyUrl = `https://www.linkedin.com/company/${comopanySlug}`;
-        const insightText = card.querySelector('.reusable-search-simple-insight__text-container span').innerText.trim();
+        const companyUrl = `https://www.linkedin.com/company/${comopanySlug}/jobs/`;
+        const spans = card.querySelectorAll('.reusable-search-simple-insight__text-container span.reusable-search-simple-insight__text--small');
+        const lastSpan = spans[spans.length - 1]; // ignore "Actively reviewing applicants", "Be an early applicant" etc
+        const insightText = lastSpan.innerText.trim();
+
         const insightValue = getInsightValue(insightText);
         debug(`(Page ${pageNum+1}) insightValue: ${insightValue}, companySlug: ${comopanySlug}`);
 
         if (jobTitleText) {
             jobs.push({
-                jobNumber: jobNum.toString(),
+                jobNumber: jobNum,
                 company: companyText || '',
                 location: locationText || '',
                 title: jobTitleText || '',
                 companySlug: comopanySlug || '',
                 companyUrl: companyUrl || '',
                 url: jobTitleLink.href || '',
-                insight: insightValue.toString() || ''
+                insight: insightValue
             });
             debug(`[x] Extracted job: ${jobTitleText}`);
         }
@@ -166,7 +169,7 @@ function getCompanySlug(card, companyText) {
     }
     const companySlug = companyText
         .toLowerCase()
-        .replace(/[^\w\s-]/g, '') // remove ! and ' etc
+        .replace(/[^\w\s-&]/g, '') // remove ! and ' etc
         .replace(/\s+/g, '-');
         //.replace(/-+/g, '-'); // for " - " etc
     return companySlug;
@@ -174,16 +177,15 @@ function getCompanySlug(card, companyText) {
 
 function getInsightValue(str) {
     if (!str) return -2;
-    if (str.startsWith("Actively reviewing applicants")) return 0;
     if (str.startsWith("No longer accepting applications")) return -1;
 
-    const timeMatch = str.match(/Posted\s+(\d+)([mwdh])\s+ago/);
+    const timeMatch = str.match(/Posted\s+(\d+)([mowdh]{1,2})\s+ago.*/);
     if (!timeMatch) return -2;
 
     const value = parseInt(timeMatch[1], 10);
     const unit = timeMatch[2];
     switch (unit) {
-        case 'm': return 30 * value;
+        case 'mo': return 30 * value;
         case 'w': return 7 * value;
         case 'd': return value;
         case 'h': return 0.5;
@@ -223,13 +225,13 @@ function convertToCSV(jobs) {
         'Company Link', 'Job Link', 'Posted days'
     ];
     const rows = jobs.map(job => [
-        escapeCSV(job.jobNumber),
+        job.jobNumber,
         escapeCSV(job.company),
         escapeCSV(job.location),
         escapeCSV(job.title),
         escapeCSV(job.companyUrl),
         escapeCSV(job.url),
-        escapeCSV(job.insight)
+        job.insight
     ]);
 
     return [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -289,10 +291,10 @@ function downloadXLSX(jobs) {
     worksheet['!cols'] = [
         { wch: 8 },  // Index
         { wch: 24 }, // Company
-        { wch: 32 }, // Location
+        { wch: 30 }, // Location
         { wch: 48 }, // Title
         { wch: 24 }, // Company Link
-        { wch: 16 }, // Job Link
+        { wch: 14 }, // Job Link
         { wch: 8 }   // Posted days
     ];
 
@@ -335,10 +337,8 @@ async function downloadExcelJS(jobs) {
         ],
         rows: rows
     });
-    //table.commit();
-    //sheet.autoFilter = { from: 'A1', to: 'G1' };
 
-    const colWidths = [8, 24, 32, 48, 24, 16, 8];
+    const colWidths = [8, 24, 30, 48, 24, 14, 8];
     sheet.columns.forEach((col, i) => {
         col.width = colWidths[i];
     });
