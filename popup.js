@@ -72,15 +72,15 @@ async function handleRecommendClick() {
     setStatus("Analyzing company profile...");
 
     const JOB_URLS = [
-        'https://www.linkedin.com/jobs/view/',
+        'https://www.linkedin.com/jobs/collections/',
         'https://www.linkedin.com/jobs/search-results/'
     ];
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!JOB_URLS.some(prefix => tab.url?.startsWith(prefix))) {
-        setStatus("Not a LinkedIn job posting page", 'error');
+        setStatus("Not a LinkedIn job search page", 'error');
         return;
     }
-
+/*
     const [{result: companyUrl}] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => document.querySelector('a[href*="linkedin.com/company/"]')?.href
@@ -89,34 +89,34 @@ async function handleRecommendClick() {
         setStatus("Company URL not found", 'error');
         return;
     }
-
+*/
     const loadingSpinner = document.getElementById('ext-loadingSpinner-recommend');
     loadingSpinner.style.display = 'block';
 
-    const { id: newTabId } = await chrome.tabs.create({ url: companyUrl, active: false });
+    // const { id: newTabId } = await chrome.tabs.create({ url: companyUrl, active: false });
 
-    // wait for the job posting page to load in new tab
-    await new Promise(
-        /** @param {function(chrome.webNavigation.NavigationDetails): void} resolve */
-        (resolve) => {
-            /**  @param {chrome.webNavigation.NavigationDetails} details */
-            const listener = (details) => {
-                if (details.tabId === newTabId && details.frameId === 0) {
-                    chrome.webNavigation.onCompleted.removeListener(listener);
-                    resolve(details);
-                }
-            };
-            chrome.webNavigation.onCompleted.addListener(listener);
-        }
-    );
+    // // wait for the job posting page to load in new tab
+    // await new Promise(
+    //     /** @param {function(chrome.webNavigation.NavigationDetails): void} resolve */
+    //     (resolve) => {
+    //         /**  @param {chrome.webNavigation.NavigationDetails} details */
+    //         const listener = (details) => {
+    //             if (details.tabId === newTabId && details.frameId === 0) {
+    //                 chrome.webNavigation.onCompleted.removeListener(listener);
+    //                 resolve(details);
+    //             }
+    //         };
+    //         chrome.webNavigation.onCompleted.addListener(listener);
+    //     }
+    // );
 
     try {
         await chrome.scripting.executeScript({
             target: { tabId: newTabId },
-            files: ["recommendJob.js"]
+            files: ["recommendJobs.js"]
         });
     } catch (err) {
-        setStatus("`recommendJob.js` Injection error: ${err.message}", 'error');
+        setStatus("`recommendJobs.js` Injection error: ${err.message}", 'error');
     } finally {
         setChromeAPIErrorStatus();
     }
