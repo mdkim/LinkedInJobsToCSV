@@ -89,7 +89,7 @@ function extractJobs() {
         const allJobLinks = card.querySelectorAll('a[href*="/jobs/view/"]');
         const jobTitleLink = allJobLinks[1];
         if (!jobTitleLink) {
-            throw new Error(`Card ${idx + 1}: Invalid saved job link`);
+            throw new Error(`Job card #${idx + 1} error: Invalid saved job link`);
         }
 
         debug(`Card ${idx + 1}: Found link - ${jobTitleLink.href}`);
@@ -208,7 +208,7 @@ async function waitForNextButton(maxWait = CONFIG.PAGE_LOAD_TIMEOUT_MS) {
         await sleep();
     }
 
-    throw new Error("Page load timeout");
+    throw new Error("`waitForNextButton` error: Page load timeout");
 }
 
 // Using ExcelJS

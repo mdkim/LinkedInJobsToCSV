@@ -3,6 +3,13 @@
 
 const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
 
+const higlightSkills = ["java", "php", "python", "react", "year", "ruby", "rust", "\\.net", "lead"];
+const commuteCities = [
+    "Los Angeles", "West Hollywood", "Beverly Hills", "Culver City",
+    "Santa Monica", "Marina del Rey", "Inglewood", "El Segundo",
+    "Universal City", "Burbank", "Glendale", "Montrose", "Pasadena"
+];
+
 // Main
 const start = Date.now();
 await main()
@@ -51,33 +58,88 @@ async function mainRecommend() {
     const results = [];
     for (const [index, topDiv] of Array.from(topDivs).entries()) {
         const paragraphs = Array.from(topDiv.querySelectorAll('p'))
-            .map(p => p.textContent.trim());
+            .map(p => {
+                const span = p.querySelector(':scope > span[aria-hidden="true"]')
+                //const span = p.querySelector(':scope > span:not([aria-hidden])') // (Verified job)
+                return span
+                    ? span.childNodes[0].textContent.trim()
+                    : p.textContent.trim();
+            });
 
         debug(`Extracting job card #${index + 1}:`);
-        const result = extractJobCard(paragraphs);
-        debug(result);
+        const jobCard = extractJobCard(paragraphs);
+        results.push(jobCard);
+        debug(jobCard);
+
+        if (jobCard.status === "Saved") {
+            debug(`Job card #${index + 1}: "Saved", skipping...`);
+            continue;
+        }
+        const location = jobCard.location;
+        if (!location.includes("(Remote)")) {
+            const isMatch = commuteCities.some(city => location.includes(city));
+            if (!isMatch) {
+                debug(`'${location}' not '(Remote)' or adjacent to LA, skipping...`);
+                continue;
+            }
+        }
 
         topDiv.dispatchEvent(
             new PointerEvent('click', { bubbles: true })
         );
         debug("Job card click dispatched");
 
-        const currSpan = await waitForStableSpan()
+        // "About the job" span from job panel
+        const currSpan = await spanFromStableJobPanel()
             .catch((err) => {
                 sendStatusToPopup(err.message, 'error');
                 throw err;
             });
-        const text = currSpan.textContent.trim();
+        const aboutTheJobText = currSpan.innerText.trim();
 
-        // TODO: construct injectedDivHTML
-        const tempText = `${text.slice(0, 100)} ...\n... ${text.slice(-100)}`
-        const href = document
+        // company URL from job panel
+        const companyUrl = document
             .querySelector('[data-testid="lazy-column"] a[href*="linkedin.com/company/"]')
-            .href;
-        const companyUrl = href.replace(/\/[\w-]+\/?$/, '/jobs/');
-        debug(`Pushing text: ${tempText}`);
-        results.push(result);
-        const injectedDivHTML = `<div>${tempText}<br>${JSON.stringify(result)}</div>`;
+            .href.replace(/\/[\w-]+\/?$/, '/jobs/');
+
+        // "About the job" higlights:
+        const keywordRegex = new RegExp(`\\b(${higlightSkills.join('|')})`, 'gi');
+
+        const textHighlights = aboutTheJobText
+            .split(/\n|\.\s+/)
+            .filter(sentence => {
+                keywordRegex.lastIndex = 0; // reset regex for 'g' flag
+                return keywordRegex.test(sentence);
+            })
+            .map(s => {
+                const highlighted = s.trim().replace(keywordRegex, '<span class="ext-highlight">$1</span>');
+                return `• ${highlighted}`;
+            })
+            .join("\n<br>\n");
+
+        // TODO: if company is in chrome.storage.local.get('exportedJobs'):
+        // `Other jobs from '${jobCard.company}' already saved & exported`
+
+        const injectedDivHTML =
+`<style>
+.ext-highlight { font-weight: 700; text-decoration: underline; color: #fff; }
+.ext-injected { margin: 0 24px 24px 24px; padding: 12px 24px 22px 24px;
+  border: 2px solid #AA6C39; border-radius: 12px; }
+</style>
+<div class="artdeco-entity-lockup--size-5 ext-injected">
+    <span class="artdeco-entity-lockup__caption"><em>Opened from</em></span>
+    <span class="artdeco-entity-lockup__title"><strong>${jobCard.jobTitle}</strong></span>
+    <br>
+    <span class="artdeco-entity-lockup__subtitle">${jobCard.location}</span>
+    <hr style="margin: 10px 0 4px 0">
+    <span class="artdeco-entity-lockup__title" style="font-size: 1.14em">
+        About the job<span style="font-weight: 360"><em>&nbsp;highlights</em></span>
+        <br>
+    </span>
+    <span class="artdeco-entity-lockup__caption">
+    ${textHighlights}
+    </span>
+</div>`;
 
         sendOpenCompanyJobsToPopup(companyUrl, injectedDivHTML, isPopupOpen => {
             if (!isPopupOpen) isPopupClosed = true;
@@ -88,7 +150,7 @@ async function mainRecommend() {
     return results;
 }
 
-async function waitForStableSpan({
+async function spanFromStableJobPanel({
     renderSettleCount = CONFIG.RENDER_SETTLE_COUNT,
     debounceCount = CONFIG.DEBOUNCE_COUNT,
     debounceMs = CONFIG.DEBOUNCE_MS

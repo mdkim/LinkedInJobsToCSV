@@ -1,5 +1,7 @@
 const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
 
+let isPopupAlive = true;
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('ext-closePopupBtn').addEventListener('click', () => {
         window.close();
@@ -10,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'open_company_jobs') {
+        if (!isPopupAlive) return;
         openTabAndInject(msg.companyUrl, msg.injectedDivHTML);
         sendResponse({status: 'ok'});
         return;
@@ -46,7 +49,10 @@ function openTabAndInject(url, injectedDivHTML) {
         .then(mewTab => {
             pendingTabs.set(mewTab.id, { injectedDivHTML });
         }).catch(
-            err => setStatus(`Error opening new tab: ${err.message}`, 'error')
+            err => {
+                setStatus(`Error opening new tab: ${err.message}`, 'error')
+                throw err;
+            }
         );
 }
 
@@ -62,14 +68,16 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
         return;
     }
 
+    pendingTabs.delete(tabId);
+
     chrome.tabs.sendMessage(tabId, {
         action: 'insert_div',
         divHTML: injectedDivHTML
     }).catch(err => {
-        setStatus(`'insert_div' in tab (${tabId}) Injection error: ${err.message}`, 'warning');
+        isPopupAlive = false;
+        setStatus(`'insert_div' in tab (${tabId}) Injection error: ${err.message}`, 'error');
+        throw err;
     });
-
-   pendingTabs.delete(tabId);
 });
 
 async function showExportedJobs() {
@@ -87,9 +95,11 @@ function setStatus(msg, type) {
     switch (type) {
         case 'warning':
             extStatus.classList.add('ext-status--warning');
+            debug(msg, 'warning');
             break;
         case 'error':
             extStatus.classList.add('ext-status--error');
+            debug(msg, 'error');
             break;
     }
     extStatus.textContent = msg;
@@ -98,6 +108,7 @@ function setStatus(msg, type) {
 
 async function handleExportClick() {
     setStatus("Gathering Saved Jobs from all pages...");
+    isPopupAlive = true;
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab.url || !tab.url.startsWith('https://www.linkedin.com/my-items/saved-jobs/')) {
@@ -125,6 +136,7 @@ async function handleExportClick() {
         });
     } catch (err) {
         setStatus(`'exportToCSV.js' Injection error: ${err.message}`, 'error');
+        throw err;
     } finally {
         setChromeAPIErrorStatus();
     }
@@ -132,6 +144,7 @@ async function handleExportClick() {
 
 async function handleRecommendClick() {
     setStatus("Gathering job recommendations...");
+    isPopupAlive = true;
 
     const JOB_URLS = [
         'https://www.linkedin.com/jobs/collections/',
@@ -155,6 +168,7 @@ async function handleRecommendClick() {
         });
     } catch (err) {
         setStatus(`'recommendJobs.js' Injection error: ${err.message}`, 'error');
+        throw err;
     } finally {
         setChromeAPIErrorStatus();
     }
@@ -162,6 +176,8 @@ async function handleRecommendClick() {
 
 function setChromeAPIErrorStatus() {
     if (chrome.runtime.lastError) {
-        setStatus(`Chrome API error: ${chrome.runtime.lastError.message}`, 'error');
+        const err = chrome.runtime.lastError;
+        setStatus(`Chrome API error: ${err.message}`, 'error');
+        throw err;
     }
 }
