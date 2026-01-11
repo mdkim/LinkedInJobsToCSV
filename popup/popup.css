@@ -20,7 +20,7 @@ button {
     font-family: inherit;
 }
 div.ext-main {
-    padding: 18px;
+    padding: 18px 18px 10px 18px;
 }
 
 .ext-h2 {
@@ -61,6 +61,13 @@ div.ext-main {
 .ext-btn:hover {
     background-color: #3071b2;
 }
+.ext-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.ext-btn:disabled:hover {
+  background: #004182;
+}
 .ext-buttonRow {
     padding-top: 6px;
     display: flex;
@@ -70,12 +77,12 @@ div.ext-main {
     margin-top: 10px;
 	border-top: 1px solid grey;
 }
-#ext-recommendBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-#ext-recommendBtn:disabled:hover {
-  background: #004182;
+
+#ext-export-info {
+    font-size: .8em;
+    font-weight: 400;
+    font-style: italic;
+    padding-top: 6px;
 }
 
 #ext-status {

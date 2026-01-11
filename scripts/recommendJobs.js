@@ -3,7 +3,11 @@
 
 const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
 
-const higlightSkills = ["java", "php", "python", "react", "year", "ruby", "rust", "\\.net", "lead"];
+const higlightSkills = [
+    "java", "php", "python", "react", "ruby", "rust", "golang",
+    "aws", "kafka", "\\.net", "ai", "llm",
+    "year", "lead", "full", "stack", "remotea"
+];
 const commuteCities = [
     "Los Angeles", "West Hollywood", "Beverly Hills", "Culver City",
     "Santa Monica", "Marina del Rey", "Inglewood", "El Segundo",
@@ -117,11 +121,8 @@ async function mainRecommend() {
             })
             .join("\n<br>\n");
 
-        // TODO: if company is in chrome.storage.local.get('exportedJobs'):
-        // `Other jobs from '${jobCard.company}' already saved & exported`
-
-        const injectedDivHTML =
-`<style>
+        let injectedDivHTML =
+            `<style>
 .ext-highlight { font-weight: 700; text-decoration: underline; color: #fff; }
 .ext-injected { margin: 0 24px 24px 24px; padding: 12px 24px 22px 24px;
   border: 2px solid #AA6C39; border-radius: 12px; }
@@ -130,7 +131,26 @@ async function mainRecommend() {
     <span class="artdeco-entity-lockup__caption"><em>Opened from</em></span>
     <span class="artdeco-entity-lockup__title"><strong>${jobCard.jobTitle}</strong></span>
     <br>
-    <span class="artdeco-entity-lockup__subtitle">${jobCard.location}</span>
+    <span class="artdeco-entity-lockup__subtitle">${jobCard.location}</span>`;
+
+        const { exportedJobs } = await chrome.storage.local.get('exportedJobs');
+        const savedJobsFromCompanyText = exportedJobs
+            .filter(job => job[1] === jobCard.company)
+            .map(job => `• ${job[3]} (${job[2]})`) // title, location
+            .join("\n<br>\n");
+        if (savedJobsFromCompanyText) {
+            injectedDivHTML += `
+    <hr style="margin: 10px 0 4px 0">
+    <span class="artdeco-entity-lockup__title" style="font-size: 1.14em">
+        Saved Jobs from '${jobCard.company}'
+        <br>
+    </span>
+    <span class="artdeco-entity-lockup__caption">
+    ${savedJobsFromCompanyText}
+    </span>`;
+        }
+
+        injectedDivHTML += `
     <hr style="margin: 10px 0 4px 0">
     <span class="artdeco-entity-lockup__title" style="font-size: 1.14em">
         About the job<span style="font-weight: 360"><em>&nbsp;highlights</em></span>
@@ -139,7 +159,8 @@ async function mainRecommend() {
     <span class="artdeco-entity-lockup__caption">
     ${textHighlights}
     </span>
-</div>`;
+</div>
+`;
 
         sendOpenCompanyJobsToPopup(companyUrl, injectedDivHTML, isPopupOpen => {
             if (!isPopupOpen) isPopupClosed = true;

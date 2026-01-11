@@ -153,7 +153,7 @@
 ## Messaging Architecture
 - **Structured messages**: Use consistent schema with fields like:
   - `type`: Category of message ('error', 'warning', 'info')
-  - `action`: Specific action to trigger ('export_done ', 'open_company_jobs', etc)
+  - `action`: Specific action to trigger ('export_done', 'open_company_jobs', etc)
   - `message`: Human-readable text
   - `data`: Payload if needed
 - **Message handlers**: Centralize in one place, use switch/if for routing

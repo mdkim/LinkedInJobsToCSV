@@ -19,25 +19,24 @@ await main()
     });
 
 async function main() {
-    const result = await mainExport()
+    const allJobs = await mainExport()
         .catch((err) => {
             sendStatusToPopup(err.message, 'error');
             throw err;
         });
-    if (!result) {
-        sendStatusToPopup("No jobs found", 'warning', 'export_done ');
+    if (!allJobs) {
+        sendStatusToPopup("No jobs found", 'warning', 'export_done');
         return;
     }
 
     const { isExportToExcel } = await chrome.storage.local.get('isExportToExcel');
     if (isExportToExcel) {
         //downloadXLSX(result); // SheetJS
-        await downloadExcelJS(result); // ExcelJS
+        await downloadExcelJS(allJobs); // ExcelJS
     } else {
-        const csv = convertToCSV(result);
-        downloadCSV(csv);
+        await downloadCSV(allJobs);
     }
-    sendStatusToPopup(`Done. Exported ${result.length} jobs`, '', 'export_done ');
+    sendStatusToPopup(`Done. Exported ${allJobs.length} jobs`, '', 'export_done');
 }
 
 async function mainExport() {
@@ -261,13 +260,11 @@ async function downloadExcelJS(jobs) {
         });
     });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-    downloadBlob(blob, `${getFilename()}.xlsx`);
+    let buffer = await workbook.xlsx.writeBuffer();
+    buffer = Array.from(new Uint8Array(buffer)); // fully serializable
+    downloadBlob(buffer, `${getFilename()}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-    await chrome.storage.local.set({ exportedJobs: rows });
+    storeExportedJobs(rows);
 }
 
 function getFilename() {
@@ -278,29 +275,46 @@ function getFilename() {
     return `Saved Jobs ${datetime}`;
 }
 
-function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+/**
+ * UTF-8 bytes (Uint8Array → number[] for serialization)
+ * @param {number[]} buffer
+ */
+function downloadBlob(buffer, filename, type) {
+    chrome.runtime.sendMessage({ action: "download", buffer, filename, type });
 }
 
-function downloadCSV(csv) {
-    const blob = new Blob([csv], { type: 'text/csv' });
-    downloadBlob(blob, `${getFilename()}.csv`);
-
-    // convert to ExcelJS style `rows`, then:
-    //await chrome.storage.local.set({ exportedJobs: rows });
+/**
+ * @param {string[][]} rows
+ * fields: [*, "Company", "Location", "Title", *, *, *]
+ */
+async function storeExportedJobs(rows) {
+    const info = {
+        lastUpdated: new Date().toLocaleString(),
+        jobsCount: rows.length
+    };
+    await chrome.storage.local.set({ exportedJobsInfo: info });
+    await chrome.storage.local.set({ exportedJobs: rows });
 }
 
-function convertToCSV(jobs) {
+async function downloadCSV(jobs) {
+    const rows = getCsvRows(jobs);
+    const csv = convertToCSV(rows);
+    const buffer = Array.from(new TextEncoder().encode(csv)); // array from Uint8Array of UTF-8 bytes
+    downloadBlob(buffer, `${getFilename()}.csv`, 'text/csv');
+
+    storeExportedJobs(rows);
+}
+
+function convertToCSV(rows) {
     const headers = [
         'Index', 'Company', 'Location', 'Title',
         'Company Link', 'Job Link', 'Posted days'
     ];
-    const rows = jobs.map(job => [
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+}
+
+function getCsvRows(jobs) {
+    return jobs.map(job => [
         job.jobNumber,
         escapeCSV(job.company),
         escapeCSV(job.location),
@@ -309,8 +323,6 @@ function convertToCSV(jobs) {
         escapeCSV(job.url),
         job.insight
     ]);
-
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
 }
 
 function escapeCSV(str) {

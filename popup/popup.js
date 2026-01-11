@@ -2,6 +2,8 @@ const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
 
 let isPopupAlive = true;
 
+showExportedJobsInfo();
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('ext-closePopupBtn').addEventListener('click', () => {
         window.close();
@@ -18,20 +20,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
     }
 
-    if (!['export_done', 'recommend_done'].includes(msg.action)) {
-        sendResponse({ status: 'ignored', message: `action '${msg.action}' not found` });
+    if (msg.action === 'download') {
+        // using chrome.downloads to prevent popup from closing after save dialog
+        const blob = new Blob([new Uint8Array(msg.buffer)], { type: msg.type });
+        const url = URL.createObjectURL(blob);
+        chrome.downloads.download({ url, filename: msg.filename });
+        sendResponse({ status: 'ok' });
         return;
     }
 
-    // msg.action === 'status':
+    if (!['status', 'export_done', 'recommend_done'].includes(msg.action)) {
+        debug(`Popup ignoring message: ${msg.action}`);
+        return;
+    }
+
+    // msg.action === 'status' or 'export_done' or 'recommend_done'
     setStatus(msg.message, msg.type);
 
     let loadingSpinner;
     let button;
-    if (msg.action === 'export_done ') {
+    if (msg.action === 'export_done') {
         button = document.getElementById('ext-exportBtn');
         loadingSpinner = document.getElementById('ext-loadingSpinner-export');
-        showExportedJobs();
+        showExportedJobsInfo();
     }
     if (msg.action === 'recommend_done') {
         button = document.getElementById('ext-recommendBtn');
@@ -80,12 +91,18 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
     });
 });
 
-async function showExportedJobs() {
-    const { exportedJobs } = await chrome.storage.local.get('exportedJobs');
-    if (exportedJobs) {
-        debugger;
-        // TODO: show exportedJobs.length + 'Last updated' datetime + small Clear (Trash) button
+async function showExportedJobsInfo() {
+    const exportInfo = document.getElementById('ext-export-info');
+    const { exportedJobsInfo } = await chrome.storage.local.get('exportedJobsInfo');
+    if (!exportedJobsInfo) {
+        exportInfo.innerHTML = '<em>No exported jobs</em>';
+        return;
     }
+
+    exportInfo.innerHTML =
+        `<em>Last exported ${exportedJobsInfo.jobsCount} jobs:
+${exportedJobsInfo.lastUpdated}</em>`;
+
 }
 
 const extStatus = document.getElementById('ext-status');
