@@ -10,13 +10,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('ext-exportBtn').addEventListener('click', handleExportClick);
     document.getElementById('ext-recommendBtn').addEventListener('click', handleRecommendClick);
+    document.getElementById('ext-highlightsBtn').addEventListener('click', handleHighlightsClick);
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'open_company_jobs') {
         if (!isPopupAlive) return;
         openTabAndInject(msg.companyUrl, msg.injectedDivHTML);
-        sendResponse({status: 'ok'});
+
+        // calm down the tab creation
+        new Promise(r => setTimeout(r, CONFIG.OPEN_TAB_CHILL_MS));
+
+        openTabAndInject(msg.companyUrl, msg.injectedDivHTML);
+
+        sendResponse({ status: 'ok' });
         return;
     }
 
@@ -29,12 +36,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
     }
 
-    if (!['status', 'export_done', 'recommend_done'].includes(msg.action)) {
+    if (!['status', 'export_done', 'recommend_done', 'highlights_done'].includes(msg.action)) {
         debug(`Popup ignoring message: ${msg.action}`);
         return;
     }
 
-    // msg.action === 'status' or 'export_done' or 'recommend_done'
+    // msg.action === 'status' or 'export_done' or 'recommend_done' or 'highlights_done'
     setStatus(msg.message, msg.type);
 
     let loadingSpinner;
@@ -47,6 +54,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'recommend_done') {
         button = document.getElementById('ext-recommendBtn');
         loadingSpinner = document.getElementById('ext-loadingSpinner-recommend');
+    }
+    if (msg.action === 'highlights_done') {
+        button = document.getElementById('ext-highlightsBtn');
+        //loadingSpinner = document.getElementById('ext-loadingSpinner-highlights');
     }
     if (button) button.disabled = false;
     if (loadingSpinner) loadingSpinner.style.display = 'none';
@@ -102,6 +113,7 @@ async function showExportedJobsInfo() {
     exportInfo.innerHTML =
         `<em>Last exported ${exportedJobsInfo.jobsCount} jobs:
 ${exportedJobsInfo.lastUpdated}</em>`;
+// TODO: calculate and show days since last export
 
 }
 
@@ -185,6 +197,39 @@ async function handleRecommendClick() {
         });
     } catch (err) {
         setStatus(`'recommendJobs.js' Injection error: ${err.message}`, 'error');
+        throw err;
+    } finally {
+        setChromeAPIErrorStatus();
+    }
+}
+
+async function handleHighlightsClick() {
+    setStatus("Gathering job recommendations...");
+    isPopupAlive = true;
+
+    const JOB_URLS = [
+        'https://www.linkedin.com/jobs/collections/',
+        'https://www.linkedin.com/jobs/search-results/',
+        'https://www.linkedin.com/jobs/view/'
+    ];
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!JOB_URLS.some(prefix => tab.url?.startsWith(prefix))) {
+        setStatus("Not a LinkedIn job post page", 'error');
+        return;
+    }
+
+    const button = document.getElementById('ext-recommendBtn');
+    button.disabled = true;
+    //const loadingSpinner = document.getElementById('ext-loadingSpinner-recommend');
+    //loadingSpinner.style.display = 'block'
+
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['scripts/utils.js', 'scripts/jobHighlights.js']
+        });
+    } catch (err) {
+        setStatus(`'jobHighlights.js' Injection error: ${err.message}`, 'error');
         throw err;
     } finally {
         setChromeAPIErrorStatus();

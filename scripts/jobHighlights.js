@@ -1,0 +1,130 @@
+(async () => {
+// IIFE scoped namespace:
+
+const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
+
+const higlightSkills = [
+    "java", "php", "python", "react", "ruby", "rust", "golang",
+    "aws", "kafka", "\\.net", "ai", "llm", "stack", "remote",
+    "year", "lead", "expert", "proficiency"
+];
+
+// Main
+const start = Date.now();
+await main()
+    .then(() => {
+        debug(`\`jobHighlights.js\` execution time: ${Date.now() - start}ms`);
+    })
+    .catch((err) => {
+        sendStatusToPopup(err.message, 'error');
+        throw err;
+    });
+
+async function main() {
+    const result = await mainHighlights()
+        .catch((err) => {
+            sendStatusToPopup(err.message, 'error');
+            throw err;
+        });
+    if (!result) {
+        sendStatusToPopup("No job post found", 'warning', 'highlights_done');
+        return;
+    }
+
+    sendStatusToPopup(`Done. Highlights shown`, '', 'highlights_done');
+}
+
+async function mainHighlights() {
+    // "About the job" span from job panel or standalone job post page
+    const currSpan = document.querySelector(
+        'span[data-testid="expandable-text-box"]'
+    );
+    const aboutTheJobText = currSpan.innerText.trim();
+
+    // "About the job" higlights:
+    const keywordRegex = new RegExp(`\\b(${higlightSkills.join('|')})`, 'gi');
+
+    const textHighlights = aboutTheJobText
+        .split(/\n|\.\s+/)
+        .filter(sentence => {
+            keywordRegex.lastIndex = 0; // reset regex for 'g' flag
+            return keywordRegex.test(sentence);
+        })
+        .map(s => {
+            const highlighted = s.trim().replace(keywordRegex, '<span class="ext-highlight">$1</span>');
+            return `• ${highlighted}`;
+        })
+        .join("\n<br>\n");
+
+    let injectedDivHTML =
+        `<div id="ext-injected" class="artdeco-entity-lockup--size-5">
+    <style>
+    #ext-injected {
+        margin: 0 24px 24px 24px;
+        padding: 12px 24px 22px 24px;
+        border: 2px solid #AA6C39;
+        border-radius: 12px;
+        font-size: 2.2em; /* <body> font-size is 66% */
+        line-height: 1.6;
+    }
+    .ext-highlight {
+        font-weight: 700;
+        text-decoration: underline;
+        color: #000;
+    }
+    hr.ext-hr {
+        margin: 14px 0px 10px 0px;
+        border-top: 2px solid;
+        border-color: #777;
+    }
+    .ext-font-title {
+        font-size: 1.4em;
+        font-weight: 600;
+    }
+    .ext-font-caption {
+        font-weight: 360;
+    }
+    </style>`;
+
+    const company = document.querySelector('[aria-label^="Company"]').textContent.trim();
+
+    const { exportedJobs } = await chrome.storage.local.get('exportedJobs');
+    const savedJobsFromCompanyText = exportedJobs
+        .filter(job => job[1] === company)
+        .map(job => `• ${job[3]}, <em>(${job[2]})</em>`) // title, location
+        .join("\n<br>\n");
+    if (savedJobsFromCompanyText) {
+        injectedDivHTML += `
+    <span class="ext-font-title">
+        Saved Jobs&nbsp;<em class="ext-font-caption">from</em>&nbsp;${company}
+        <br>
+    </span>
+    <span class="ext-font-caption">
+    ${savedJobsFromCompanyText}
+    </span>`;
+    }
+
+    injectedDivHTML += `
+    <hr class="ext-hr">
+    <span class="ext-font-title">
+        About the job&nbsp;<em class="ext-font-caption">highlights</em>
+        <br>
+    </span>
+    <span class="ext-font-caption">
+    ${textHighlights}
+    </span>
+</div>
+`;
+
+    document.getElementById('ext-injected')?.remove();
+
+    document.querySelector('[aria-label^="Company"]')
+        .closest('[data-display-contents="true"]')
+        .parentElement
+        .insertAdjacentHTML('afterend', injectedDivHTML);
+
+    return 1;
+}
+
+// end IIFE
+})();

@@ -5,8 +5,8 @@ const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
 
 const higlightSkills = [
     "java", "php", "python", "react", "ruby", "rust", "golang",
-    "aws", "kafka", "\\.net", "ai", "llm",
-    "year", "lead", "full", "stack", "remotea"
+    "aws", "kafka", "\\.net", "ai", "llm", "stack", "remote",
+    "year", "lead", "expert", "proficiency"
 ];
 const commuteCities = [
     "Los Angeles", "West Hollywood", "Beverly Hills", "Culver City",
@@ -36,7 +36,7 @@ async function main() {
         return;
     }
 
-    sendStatusToPopup(`Done. Exported ${result.length} jobs`, '', 'recommend_done');
+    sendStatusToPopup(`Done. Opened ${result.length} jobs tabs`, '', 'recommend_done');
 }
 
 function sendOpenCompanyJobsToPopup(companyUrl, injectedDivHTML, cbPopupOpen) {
@@ -58,6 +58,7 @@ async function mainRecommend() {
         'div[data-view-name="job-search-job-card"] [role="button"] > div > div'
     );
 
+    const companiesDone = new Set();
     let isPopupClosed = false;
     const results = [];
     for (const [index, topDiv] of Array.from(topDivs).entries()) {
@@ -70,22 +71,26 @@ async function mainRecommend() {
                     : p.textContent.trim();
             });
 
-        debug(`Extracting job card #${index + 1}:`);
+        const jobCardPre = `Job card #${index + 1}:`;
+        debug(`Extracting, ${jobCardPre}`);
         const jobCard = extractJobCard(paragraphs);
-        results.push(jobCard);
         debug(jobCard);
 
         if (jobCard.status === "Saved") {
-            debug(`Job card #${index + 1}: "Saved", skipping...`);
+            debug(`${jobCardPre} "Saved", skipping...`);
             continue;
         }
         const location = jobCard.location;
         if (!location.includes("(Remote)")) {
             const isMatch = commuteCities.some(city => location.includes(city));
             if (!isMatch) {
-                debug(`'${location}' not '(Remote)' or adjacent to LA, skipping...`);
+                debug(`${jobCardPre} '${location}' not '(Remote)' or adjacent to LA, skipping...`);
                 continue;
             }
+        }
+        if (companiesDone.has(jobCard.company)) {
+            debug(`${jobCardPre} '${jobCard.company}' already done, skipping...`);
+            continue;
         }
 
         topDiv.dispatchEvent(
@@ -100,6 +105,9 @@ async function mainRecommend() {
                 throw err;
             });
         const aboutTheJobText = currSpan.innerText.trim();
+
+        results.push(jobCard);
+        companiesDone.add(jobCard.company);
 
         // company URL from job panel
         const companyUrl = document
@@ -122,12 +130,28 @@ async function mainRecommend() {
             .join("\n<br>\n");
 
         let injectedDivHTML =
-            `<style>
-.ext-highlight { font-weight: 700; text-decoration: underline; color: #fff; }
-.ext-injected { margin: 0 24px 24px 24px; padding: 12px 24px 22px 24px;
-  border: 2px solid #AA6C39; border-radius: 12px; }
-</style>
-<div class="artdeco-entity-lockup--size-5 ext-injected">
+            `<div id="ext-injected" class="artdeco-entity-lockup--size-5">
+    <style>
+    #ext-injected {
+        margin: 0 24px 24px 24px;
+        padding: 12px 24px 22px 24px;
+        border: 2px solid #AA6C39;
+        border-radius: 12px;
+    }
+    .ext-highlight {
+        font-weight: 700;
+        text-decoration: underline;
+        color: #000;
+    }
+    hr.ext-hr {
+        margin: 14px 0px 10px 0px;
+        border-top: 2px solid;
+        border-color: #777;
+    }
+    .ext-font-caption {
+        font-weight: 360;
+    }
+    </style>
     <span class="artdeco-entity-lockup__caption"><em>Opened from</em></span>
     <span class="artdeco-entity-lockup__title"><strong>${jobCard.jobTitle}</strong></span>
     <br>
@@ -136,13 +160,13 @@ async function mainRecommend() {
         const { exportedJobs } = await chrome.storage.local.get('exportedJobs');
         const savedJobsFromCompanyText = exportedJobs
             .filter(job => job[1] === jobCard.company)
-            .map(job => `• ${job[3]} (${job[2]})`) // title, location
+            .map(job => `• ${job[3]}, <em>(${job[2]})</em>`) // title, location
             .join("\n<br>\n");
         if (savedJobsFromCompanyText) {
             injectedDivHTML += `
-    <hr style="margin: 10px 0 4px 0">
+    <hr class="ext-hr">
     <span class="artdeco-entity-lockup__title" style="font-size: 1.14em">
-        Saved Jobs from '${jobCard.company}'
+        Saved Jobs&nbsp;<em class="ext-font-caption">from</em>&nbsp;${jobCard.company}
         <br>
     </span>
     <span class="artdeco-entity-lockup__caption">
@@ -151,9 +175,9 @@ async function mainRecommend() {
         }
 
         injectedDivHTML += `
-    <hr style="margin: 10px 0 4px 0">
+    <hr class="ext-hr">
     <span class="artdeco-entity-lockup__title" style="font-size: 1.14em">
-        About the job<span style="font-weight: 360"><em>&nbsp;highlights</em></span>
+        About the job&nbsp;<em class="ext-font-caption"></em>
         <br>
     </span>
     <span class="artdeco-entity-lockup__caption">

@@ -5,7 +5,7 @@
 
 body {
     width: 360px;
-    height: 320px;
+    height: 392px;
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -31,6 +31,11 @@ div.ext-main {
     display: flex;
     align-items: center;
 }
+.ext-loadingSpinner {
+    width: 60px;
+    height: 60px;
+    display: none;
+}
 #ext-closePopupBtn {
     position: absolute;
     top: 1.0rem;
@@ -38,11 +43,6 @@ div.ext-main {
     width: 40px;
     height: 32px;
     cursor: pointer;
-}
-.ext-loadingSpinner {
-    width: 60px;
-    height: 60px;
-    display: none;
 }
 
 .ext-btn {

@@ -297,24 +297,7 @@ async function storeExportedJobs(rows) {
 }
 
 async function downloadCSV(jobs) {
-    const rows = getCsvRows(jobs);
-    const csv = convertToCSV(rows);
-    const buffer = Array.from(new TextEncoder().encode(csv)); // array from Uint8Array of UTF-8 bytes
-    downloadBlob(buffer, `${getFilename()}.csv`, 'text/csv');
-
-    storeExportedJobs(rows);
-}
-
-function convertToCSV(rows) {
-    const headers = [
-        'Index', 'Company', 'Location', 'Title',
-        'Company Link', 'Job Link', 'Posted days'
-    ];
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
-}
-
-function getCsvRows(jobs) {
-    return jobs.map(job => [
+    const csvRows = jobs.map(job => [
         job.jobNumber,
         escapeCSV(job.company),
         escapeCSV(job.location),
@@ -323,6 +306,22 @@ function getCsvRows(jobs) {
         escapeCSV(job.url),
         job.insight
     ]);
+    const headers = [
+        'Index', 'Company', 'Location', 'Title',
+        'Company Link', 'Job Link', 'Posted days'
+    ];
+    const csv = [headers, ...csvRows].map(row => row.join(',')).join('\n')
+
+    const buffer = Array.from(new TextEncoder().encode(csv)); // array from Uint8Array of UTF-8 bytes
+    downloadBlob(buffer, `${getFilename()}.csv`, 'text/csv');
+
+    const storedRows = jobs.map(job => [
+        job.jobNumber,
+        job.company,
+        job.location,
+        job.title
+    ]);
+    storeExportedJobs(storedRows);
 }
 
 function escapeCSV(str) {
@@ -334,7 +333,7 @@ function escapeCSV(str) {
 
 /* // Not used (SheetJS), see `downloadExcelJS()`
 function downloadXLSX(jobs) {
-    const jsonJobs = jobs.map(job => ({
+    const rows = jobs.map(job => ({
         'Index': job.jobNumber,
         'Company': job.company,
         'Location': job.location,
@@ -353,7 +352,7 @@ function downloadXLSX(jobs) {
         'Posted days': job.insight
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(jsonJobs);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
     worksheet['!cols'] = [
         { wch: 8 },  // Index
         { wch: 24 }, // Company
@@ -366,10 +365,13 @@ function downloadXLSX(jobs) {
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Saved Jobs");
-    XLSX.writeFile(workbook, `${getFilename()}.xlsx`);
 
-    // convert to ExcelJS style `rows`, then:
-    //await chrome.storage.local.set({ exportedJobs: rows });
+    //XLSX.writeFile(workbook, `${getFilename()}.xlsx`);
+    let buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    buffer = Array.from(new Uint8Array(buffer)); // fully serializable
+    downloadBlob(buffer, `${getFilename()}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    storeExportedJobs(rows);
 } */
 
 // end IIFE

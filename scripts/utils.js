@@ -3,6 +3,9 @@
 const CONFIG = {
     DEBUG: true,
 
+    // for `popup.js`
+    OPEN_TAB_CHILL_MS: 400,
+
     // for `exportToCSV.js`
     PAGE_CHANGE_WAIT_MS: 150,
     PAGE_LOAD_TIMEOUT_MS: 3000,
