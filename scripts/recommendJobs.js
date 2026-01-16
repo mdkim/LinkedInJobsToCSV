@@ -3,11 +3,6 @@
 
 const { CONFIG, debug, sendStatusToPopup } = window.__LJ2CSV_UTILS__;
 
-const higlightSkills = [
-    "java", "php", "python", "react", "ruby", "rust", "golang",
-    "aws", "kafka", "\\.net", "ai", "llm", "stack", "remote",
-    "year", "lead", "expert", "proficiency"
-];
 const commuteCities = [
     "Los Angeles", "West Hollywood", "Beverly Hills", "Culver City",
     "Santa Monica", "Marina del Rey", "Inglewood", "El Segundo",
@@ -115,7 +110,7 @@ async function mainRecommend() {
             .href.replace(/\/[\w-]+\/?$/, '/jobs/');
 
         // "About the job" higlights:
-        const keywordRegex = new RegExp(`\\b(${higlightSkills.join('|')})`, 'gi');
+        const keywordRegex = new RegExp(`\\b(${CONFIG.HIGHLIGHT_SKILLS.join('|')})`, 'gi');
 
         const textHighlights = aboutTheJobText
             .split(/\n|\.\s+/)
@@ -206,9 +201,10 @@ async function spanFromStableJobPanel({
 
     while (true) {
         debug("Looping in `waitForStableSpan()`");
-        const span = document.querySelector(
+        const span = (
             // selector for /search-results/, or for /search/
-            'span[data-testid="expandable-text-box"], #job-details .mt4 p[dir] span'
+            document.querySelector('span[data-testid="expandable-text-box"]')
+            ?? document.querySelector('#job-details .mt4 p[dir] span')
         );
 
         if (span && span === prevSpan) {

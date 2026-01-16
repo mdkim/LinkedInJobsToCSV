@@ -8,9 +8,33 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('ext-closePopupBtn').addEventListener('click', () => {
         window.close();
     });
-    document.getElementById('ext-exportBtn').addEventListener('click', handleExportClick);
-    document.getElementById('ext-recommendBtn').addEventListener('click', handleRecommendClick);
-    document.getElementById('ext-highlightsBtn').addEventListener('click', handleHighlightsClick);
+
+    document.getElementById('ext-exportBtn').addEventListener('click', () => {
+        handleExportClick().catch((err) => {
+            setStatus(`\`handleExportClick()\` error: ${err.message}`, 'error');
+        });
+    });
+    document.getElementById('ext-recommendBtn').addEventListener('click', () => {
+        const input = document.getElementById('ext-recommend-tabs')
+        if (input.value === '') input.value = input.placeholder;
+        handleRecommendClick().catch((err) => {
+            setStatus(`\`handleRecommendClick()\` error: ${err.message}`, 'error');
+        });
+    });
+    document.getElementById('ext-highlightsBtn').addEventListener('click', () => {
+        handleHighlightsClick().catch((err) => {
+            setStatus(`\`handleHighlightsClick()\` error: ${err.message}`, 'error');
+        });
+    });
+
+    const tabsAllCheck = document.getElementById('ext-recommend-tabs-all');
+    tabsAllCheck.addEventListener('change', () => {
+        document.getElementById('ext-recommend-tabs').disabled = tabsAllCheck.checked;
+        tabsAllCheck.nextElementSibling.classList.toggle('grayed');
+    });
+    document.getElementById('ext-recommend-tabs').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('ext-recommendBtn').click();
+    });
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -110,11 +134,17 @@ async function showExportedJobsInfo() {
         return;
     }
 
+    const lastUpdated = exportedJobsInfo.lastUpdated;
+    const daysAgo = Math.floor(
+        (new Date().getTime() - lastUpdated) / (1000*60*60*24)
+    );
+    const daysAgoStr = (daysAgo === 0 ? 'Today' : (
+        daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`
+    ));
     exportInfo.innerHTML =
-        `<em>Last exported ${exportedJobsInfo.jobsCount} jobs:
-${exportedJobsInfo.lastUpdated}</em>`;
-// TODO: calculate and show days since last export
-
+        `<em title="${new Date(lastUpdated).toLocaleString()}">Last exported
+<strong>${exportedJobsInfo.jobsCount} jobs</strong>
+&nbsp;(${daysAgoStr})</em>`;
 }
 
 const extStatus = document.getElementById('ext-status');
@@ -140,7 +170,7 @@ async function handleExportClick() {
     isPopupAlive = true;
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab.url || !tab.url.startsWith('https://www.linkedin.com/my-items/saved-jobs/')) {
+    if (!tab.url.startsWith('https://www.linkedin.com/my-items/saved-jobs/')) {
         setStatus("Not a LinkedIn Saved Jobs page", 'error');
         return;
     }
@@ -150,8 +180,9 @@ async function handleExportClick() {
     const loadingSpinner = document.getElementById('ext-loadingSpinner-export');
     loadingSpinner.style.display = 'block';
 
-    const isExportToExcel = document.querySelector('#ext-xlsxCheckbox').checked;
-    await chrome.storage.local.set({ isExportToExcel });
+    await chrome.storage.local.set({
+        isExportToExcel: document.getElementById('ext-xlsxCheckbox').checked
+    });
 
     const jsFiles = ['scripts/utils.js', 'scripts/exportToCSV.js'];
     if (isExportToExcel) {
@@ -176,8 +207,9 @@ async function handleRecommendClick() {
     isPopupAlive = true;
 
     const JOB_URLS = [
-        'https://www.linkedin.com/jobs/collections/',
-        'https://www.linkedin.com/jobs/search-results/'
+        'https://www.linkedin.com/jobs/search/',
+        'https://www.linkedin.com/jobs/search-results/',
+        'https://www.linkedin.com/jobs/collections/'
     ];
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!JOB_URLS.some(prefix => tab.url?.startsWith(prefix))) {
@@ -189,6 +221,13 @@ async function handleRecommendClick() {
     button.disabled = true;
     const loadingSpinner = document.getElementById('ext-loadingSpinner-recommend');
     loadingSpinner.style.display = 'block';
+
+    let maxTabsToOpen = Number(document.getElementById('ext-recommend-tabs').value);
+    maxTabsToOpen = !isNaN(maxTabsToOpen) ? maxTabsToOpen : 0;
+    await chrome.storage.local.set({
+        isStartAtSelectedJob: !document.getElementById('ext-recommend-tabs-all').checked,
+        maxTabsToOpen
+    });
 
     try {
         await chrome.scripting.executeScript({
@@ -204,14 +243,14 @@ async function handleRecommendClick() {
 }
 
 async function handleHighlightsClick() {
-    setStatus("Gathering job recommendations...");
+    setStatus("Gathering job highlights...");
     isPopupAlive = true;
 
     const JOB_URLS = [
-        'https://www.linkedin.com/jobs/collections/',
-        'https://www.linkedin.com/jobs/search-results/',
+        'https://www.linkedin.com/jobs/search/',
         'https://www.linkedin.com/jobs/view/',
-        'https://www.linkedin.com/jobs/search/'
+        'https://www.linkedin.com/jobs/search-results/',
+        'https://www.linkedin.com/jobs/collections/'
     ];
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!JOB_URLS.some(prefix => tab.url?.startsWith(prefix))) {
@@ -226,7 +265,7 @@ async function handleHighlightsClick() {
 
     try {
         await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ['scripts/utils.js', 'scripts/jobHighlights.js']
         });
     } catch (err) {

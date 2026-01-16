@@ -14,7 +14,14 @@ const CONFIG = {
     // for `recommendJobs.js`
     RENDER_SETTLE_COUNT: 2,
     DEBOUNCE_COUNT: 15,
-    DEBOUNCE_MS: 150
+    DEBOUNCE_MS: 150,
+
+    // for `jobHighlights.js`, 'recommendJobs.js`
+    HIGHLIGHT_SKILLS: [
+        "java", "php", "python", "react", "ruby", "rust", "golang",
+        "aws", "\\.net", "ai", "llm", "stack", "data", "remote",
+        "years", "lead", "expert", "proficiency", "advanced"
+    ]
 };
 
 function debug(msg, level = 'info') {
@@ -23,15 +30,17 @@ function debug(msg, level = 'info') {
     }
     switch(level) {
         case 'warning':
-            console.warn('[lj2csv]', msg);
+            console.warn('[lj2csv] [warn]', msg);
             break;
         case 'error':
-            console.error('[lj2csv]', msg);
+            console.error('[lj2csv] [error]', msg);
             break;
     }
 }
 
-function sendStatusToPopup(msg, type, action = 'status') {
+function sendStatusToPopup(msg, type = 'info', action = 'status') {
+    debug(`\`sendStatusToPopup()\`: ${msg}`, type);
+
     chrome.runtime.sendMessage({
         message: msg,
         type,

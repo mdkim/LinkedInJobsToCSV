@@ -100,7 +100,7 @@ function extractJobs() {
 
         debug(`Found title via link: "${jobTitleText}"`);
 
-        const textDivs = card.querySelectorAll('div[class*="t-14"]');
+        const textDivs = card.querySelectorAll('[class*="t-14"]');
         debug(`Found ${textDivs.length} divs with [class*="t-14"]`);
 
         let companyText = '';
@@ -179,13 +179,15 @@ function getInsightValue(str) {
         case 'mo': return 30 * value;
         case 'w': return 7 * value;
         case 'd': return value;
-        case 'h': return 0.5;
+        case 'h':
+        case 'm':
+            return 0.5;
     }
     return -2;
 }
 
 async function waitForNextButton(maxWait = CONFIG.PAGE_LOAD_TIMEOUT_MS) {
-    const sleep = () => new Promise(resolve => setTimeout(resolve, CONFIG.PAGE_CHANGE_WAIT_MS));
+    const sleep = () => new Promise(r => setTimeout(r, CONFIG.PAGE_CHANGE_WAIT_MS));
     const getPageState = () => document.querySelector('.artdeco-pagination__page-state')?.
         textContent.trim();
     const oldPageState = getPageState();
@@ -289,8 +291,8 @@ function downloadBlob(buffer, filename, type) {
  */
 async function storeExportedJobs(rows) {
     const info = {
-        lastUpdated: new Date().toLocaleString(),
-        jobsCount: rows.length
+        jobsCount: rows.length,
+        lastUpdated: new Date().getTime()
     };
     await chrome.storage.local.set({ exportedJobsInfo: info });
     await chrome.storage.local.set({ exportedJobs: rows });
