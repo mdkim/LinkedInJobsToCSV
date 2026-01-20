@@ -44,9 +44,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // calm down the tab creation
         new Promise(r => setTimeout(r, CONFIG.OPEN_TAB_CHILL_MS));
-
-        openTabAndInject(msg.companyUrl, msg.injectedDivHTML);
-
+        
         sendResponse({ status: 'ok' });
         return;
     }

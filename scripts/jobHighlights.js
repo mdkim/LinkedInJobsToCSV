@@ -194,19 +194,21 @@ function getInjectedDivStyle() {
     }
     window.__extInjectedObserverConnected = true;
 
-    const sleep = () => new Promise(resolve => setTimeout(resolve, CONFIG.DEBOUNCE_MS * (CONFIG.DEBOUNCE_COUNT/2)));
+    const sleep = () => new Promise(r => setTimeout(r, CONFIG.DEBOUNCE_MS * (CONFIG.DEBOUNCE_COUNT/2)));
     const connectObserver = () => {
         const injectedDiv = document.getElementById('ext-injected');
         observer.observe(injectedDiv.parentElement, { childList: true, subtree: true });
     }
     const observer = new MutationObserver(async () => {
         observer.disconnect();
-        await sleep();
-
+        await sleep(); // prevent "flashing" injected div
         await mainHighlights();
+
         debug("connectObserver() [1]");
         connectObserver();
     });
+    window.__extInjectedObserver = observer; // reference for disconnect
+
     debug("connectObserver() [2]");
     connectObserver();
 })();
