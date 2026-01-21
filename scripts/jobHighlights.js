@@ -31,13 +31,13 @@ async function main() {
         return;
     }
 
-    sendStatusToPopup(`Done, highlights shown`, '', 'highlights_done');
+    sendStatusToPopup(`Done. Highlights shown`, '', 'highlights_done');
 }
 
 async function mainHighlights() {
     // "About the job" span from job panel or standalone job post page
     const aboutTheTextEl = (
-        // for '/search/' ✅, '/view' ✅
+        // for '/search/' ✅, '/collections/' ✅, '/view' ✅
         document.querySelector('#job-details .mt4 p[dir]')
         // for '/search-results/' ✅
         ?? document.querySelector('span[data-testid="expandable-text-box"]')
@@ -62,7 +62,7 @@ async function mainHighlights() {
         .join("\n<br>\n");
 
     const company = (
-        // for '/search/' ✅ (must run before '/search-results/' selector),
+        // for '/search/' ✅, '/collections/' ✅ (must run before '/search-results/' selector),
         // for '/view' ✅
         document.querySelector('.job-details-jobs-unified-top-card__company-name')
         // for '/search-results/' ✅
@@ -105,7 +105,7 @@ async function mainHighlights() {
 
     document.getElementById('ext-injected')?.remove();
     (
-        // for '/search/' ✅ (grandparent of '/view/' selector)
+        // for '/search/' ✅, '/collections/' ✅ (grandparent of '/view/' selector)
         document.querySelector('.job-details-jobs-unified-top-card__container--two-pane')
         // for '/view/' ✅
         ?? document.querySelector('.job-details-jobs-unified-top-card__primary-description-container')

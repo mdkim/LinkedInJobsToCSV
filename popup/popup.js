@@ -206,8 +206,8 @@ async function handleRecommendClick() {
 
     const JOB_URLS = [
         'https://www.linkedin.com/jobs/search/',
-        'https://www.linkedin.com/jobs/search-results/',
-        'https://www.linkedin.com/jobs/collections/'
+        'https://www.linkedin.com/jobs/collections/',
+        'https://www.linkedin.com/jobs/search-results/'
     ];
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!JOB_URLS.some(prefix => tab.url?.startsWith(prefix))) {
@@ -246,9 +246,9 @@ async function handleHighlightsClick() {
 
     const JOB_URLS = [
         'https://www.linkedin.com/jobs/search/',
+        'https://www.linkedin.com/jobs/collections/',
         'https://www.linkedin.com/jobs/view/',
-        'https://www.linkedin.com/jobs/search-results/',
-        'https://www.linkedin.com/jobs/collections/'
+        'https://www.linkedin.com/jobs/search-results/'
     ];
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!JOB_URLS.some(prefix => tab.url?.startsWith(prefix))) {

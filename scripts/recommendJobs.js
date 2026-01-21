@@ -51,21 +51,23 @@ function sendOpenCompanyJobsToPopup(companyUrl, injectedDivHTML, cbPopupOpen) {
 async function mainRecommend() {
     // remove MutationObserver on 'ext-injected'
     window.__extInjectedObserver?.disconnect();
+    window.__extInjectedObserverConnected = false;
+    document.getElementById('ext-injected')?.remove();
 
     let topDivs, paragraphsType;
     {
-        // for '/search-results/'
+        // for '/search/', '/collections/'
         topDivs = document.querySelectorAll(
-            '[data-view-name="job-search-job-card"] [role="button"]' // > div > div'
-        );
-        paragraphsType = 'p';
-    }
-    if (topDivs.length === 0) {
-        // for '/search/'
-        topDivs = document.querySelectorAll(
-            '.scaffold-layout__list > div > ul > li > div > div'
+            'li.scaffold-layout__list-item .job-card-container--clickable'
         );
         paragraphsType = 'span';
+    }
+    if (topDivs.length === 0) {
+        // for '/search-results/'
+        topDivs = document.querySelectorAll(
+            '[data-view-name="job-search-job-card"] [role="button"]'
+        );
+        paragraphsType = 'p';
     }
     if (topDivs.length === 0) {
         return [];
@@ -87,10 +89,10 @@ async function mainRecommend() {
                 break;
             }
             if (!isStarted
+                // for '/search/', '/collections/'
+                && !topDiv.classList.contains('jobs-search-results-list__list-item--active')
                 // for '/search-results/'
                 && !getComputedStyle(topDiv.parentElement.parentElement).backgroundColor.endsWith(", 0.1)")
-                // for '/search/'
-                && !topDiv.classList.contains('jobs-search-results-list__list-item--active')
             ) {
                 continue;
             }
@@ -98,14 +100,15 @@ async function mainRecommend() {
         }
 
         const paragraphs = [...topDiv.querySelectorAll(paragraphsType)]
-            .filter(p => !p.classList.contains('visually-hidden')) // for '/search/' only
+            .filter(p => !p.classList.contains('visually-hidden')) // for '/search/', '/collections/' only
             .map(p => {
                 const span = p.querySelector(':scope > span[aria-hidden="true"]')
                 // p.querySelector(':scope > span:not([aria-hidden])') // (Verified job)
                 return span
-                    ? span.childNodes[0].textContent.trim()
+                    ? span.childNodes[0].textContent.trim() // jobTitle
                     : p.textContent.trim();
-            });
+            })
+            .filter(p => p !== '');
 
         const jobCardPre = `Job card #${index + 1}:`;
         debug(`Extracting, ${jobCardPre}`);
@@ -147,10 +150,10 @@ async function mainRecommend() {
 
         // company URL from job panel
         const companyUrl = (
+            // for '/search/', '/collections/'
+            document.querySelector('.job-details-jobs-unified-top-card__company-name a[href]')
             // for '/search-results/'
-            document.querySelector('[data-testid="lazy-column"] a[href*="linkedin.com/company/"]')
-            // for '/search/'
-            ?? document.querySelector('.job-details-jobs-unified-top-card__company-name a[href]')
+            ?? document.querySelector('[data-testid="lazy-column"] a[href*="linkedin.com/company/"]')
         )
             .href.replace(/\/[\w-]+\/?$/, '/jobs/');
 
@@ -249,10 +252,10 @@ async function spanFromStableJobPanel({
     while (true) {
         debug("Looping in `waitForStableSpan()`");
         const span = (
+            // for '/search/', '/collections/'
+            document.querySelector('#job-details .mt4 p[dir]') // ✅
             // for '/search-results/'
-            document.querySelector('span[data-testid="expandable-text-box"]')
-            // for '/search/'
-            ?? document.querySelector('#job-details .mt4 p[dir]') // ✅
+            ?? document.querySelector('span[data-testid="expandable-text-box"]') // ✅
         );
 
         if (span && span === prevSpan) {
