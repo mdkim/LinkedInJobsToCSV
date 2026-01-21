@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "LinkedIn Jobs to CSV",
+    "name": "LinkedIn Jobs Assistant",
     "version": "1.0",
-    "description": "Export LinkedIn Saved Jobs to CSV",
+    "description": "Export LinkedIn Saved Jobs Assistant",
     "permissions": [
         "activeTab",
         "scripting",
@@ -11,7 +11,7 @@
         "tabs"
     ],
     "action": {
-        "default_title": "LinkedIn Jobs to CSV",
+        "default_title": "LinkedIn Jobs Assistant",
         "default_popup": "popup/popup.html",
         "default_icon": {
             "16": "icons/icon16.png",

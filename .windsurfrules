@@ -106,19 +106,26 @@
   - Use `files:` parameter for non-trivial scripts
   - Use `func:` only for simple one-liners
   - Inject dependencies before main script when needed
+  - Consider `allFrames: true` when targeting iframes or dynamic content
 - **Messaging**:
   - Include `type` or `action` field for message categorization
   - Handle `chrome.runtime.lastError` in all API callbacks
   - Use `chrome.storage.local` for persisting user preferences
   - Send status updates back to UI for long operations
+  - Use `sendResponse` callbacks to detect if popup is still open
 - **Permissions**: Request minimal necessary permissions in manifest
 - **Error boundaries**: Wrap API callbacks in try-catch or check for errors
+- **Tab lifecycle management**:
+  - Track pending tabs with Map/Set for deferred operations
+  - Clean up listeners and observers when tabs close
+  - Use `chrome.tabs.onUpdated` to inject content after page load
 
 ## DOM Interaction (Web Scraping / Content Scripts)
 - **Query selectors**:
   - Prefer semantic selectors (`[role="list"]`, `[aria-label="..."]`) over generated classes
   - Use stable attributes (data-*, id) when available
   - Avoid deeply nested selectors
+  - Build selector fallback chains for different page layouts
 - **Handle null results**: Always check if query methods returned elements
 - **Text extraction**:
   - Use `innerText` when you want rendered, user-visible text
@@ -127,11 +134,70 @@
 - **Wait for elements**: Implement proper waiting logic, not arbitrary timeouts
 - **Cache DOM queries**: When accessing the same element multiple times
 
+## Multi-URL Support & Page Detection
+- **Selector fallback chains**: When the same content appears in different formats across URLs
+  ```javascript
+  const element = (
+      document.querySelector('.format-a-selector')
+      ?? document.querySelector('.format-b-selector')
+      ?? document.querySelector('.format-c-selector')
+  );
+  ```
+- **Comment each selector**: Indicate which URLs/page types each selector targets
+- **Test across all target pages**: Verify selectors work on /search/, /collections/, /view/, /search-results/, etc.
+- **Graceful degradation**: Return early with informative message when page structure doesn't match
+
+## MutationObserver Patterns
+- **When to use observers**: For content that updates without full page reloads (SPAs, dynamic panels)
+- **Disconnect before reconnecting**: Always disconnect observer before making changes that would trigger it
+- **Debouncing rapid mutations**:
+  ```javascript
+  const sleep = () => new Promise(r => setTimeout(r, DEBOUNCE_MS));
+  observer.disconnect();
+  await sleep(); // prevent "flashing" content
+  await updateContent();
+  observer.observe(target, config);
+  ```
+- **Store observer references**: Use `window.__observerName` for cross-script access (disconnect/cleanup)
+- **Observe parent elements**: Target stable containers, not the content being replaced
+- **Configuration**: Use `{ childList: true, subtree: true }` for nested content changes
+- **Guard against infinite loops**: Ensure observer callbacks don't trigger themselves
+
+## Dynamic Content & Rendering
+- **Stable element detection**: Wait for elements to stop changing before processing
+  ```javascript
+  let prevElement = null;
+  let stableCount = 0;
+  while (stableCount < REQUIRED_STABLE_COUNT) {
+      const element = document.querySelector(selector);
+      if (element === prevElement) {
+          stableCount++;
+      } else {
+          stableCount = 0;
+          prevElement = element;
+      }
+      await waitFrame();
+  }
+  ```
+- **Combine RAF and setTimeout**: Use `requestAnimationFrame` for quick checks, fall back to `setTimeout` for debouncing
+- **Page state indicators**: Look for stable elements that indicate page load (pagination state, etc.)
+
+## Cross-Script Coordination
+- **Shared utilities**: Export common functions via `window.__NAMESPACE__` for IIFE scripts
+- **Storage as shared state**: Use `chrome.storage.local` for data needed across features/scripts
+- **Message passing**:
+  - Content script → Background → Popup for UI updates
+  - Popup → Background → Content script for tab injection
+  - Include callback functions to detect popup closure
+- **Deferred operations**: Track pending work in Maps/Sets when target isn't ready yet
+- **Cleanup on disconnect**: Store observer/listener references for proper cleanup
+
 ## Regex & String Processing
 - **Global flag for multiple matches**: Use `/pattern/g` when replacing all occurrences
 - **Normalize whitespace**: `replace(/\s+/g, ' ')` is a common pattern
 - **Chain replacements**: Normalize in logical order (remove suffixes → collapse whitespace → trim)
 - **Test edge cases**: Empty strings, special characters, Unicode
+- **Reset `lastIndex` for global regexes**: When reusing regex in loops with `test()` or `exec()`
 
 ## File Generation & Downloads
 - **Abstract common patterns**: Extract blob download logic if used multiple times
@@ -143,12 +209,15 @@
   - Structure code to easily add new export formats
   - Use same data structure for all formats
   - Load format-specific libraries conditionally
+- **Serialize for messaging**: Convert Uint8Array to regular arrays for `chrome.runtime.sendMessage`
+- **Prevent popup closure**: Use `chrome.downloads` API instead of direct blob downloads
 
 ## External Library Integration
 - **Conditional loading**: Only load libraries when needed based on user choice
 - **Prefer CDN versions for extensions**: Smaller bundle size
 - **Check library availability**: Verify library loaded before using
 - **Wrap library calls**: Create abstraction layer for complex libraries
+- **Keep alternatives**: Comment out replaced libraries with notes on why switched
 
 ## Messaging Architecture
 - **Structured messages**: Use consistent schema with fields like:
@@ -157,13 +226,25 @@
   - `message`: Human-readable text
   - `data`: Payload if needed
 - **Message handlers**: Centralize in one place, use switch/if for routing
-- **Bidirectional communication**: Content scripts → background → popup
+- **Bidirectional communication**: Content scripts ↔ background ↔ popup
+- **Response callbacks**: Use to detect popup state and handle accordingly
 
 ## UI State Management
 - **Explicit visibility control**: Don't rely on CSS alone for show/hide
 - **Loading indicators**: Show during async operations, hide on completion
 - **Status feedback**: Update UI for all state changes (loading, success, error)
 - **CSS class conventions**: Use BEM-like modifier classes (`component--state`)
+- **Disable buttons during operations**: Prevent double-clicks and race conditions
+- **Smooth transitions**: Use CSS transitions for height/opacity changes
+
+## Storage Patterns
+- **Store processed data**: Save results of expensive operations for reuse across features
+- **Include metadata**: Store timestamps, counts, version info alongside data
+- **Retrieve with defaults**: Use object destructuring with fallbacks
+  ```javascript
+  const { exportedJobs = [] } = await chrome.storage.local.get('exportedJobs');
+  ```
+- **Update atomically**: Store related data together to avoid inconsistent state
 
 ## Comments & Documentation
 - **When to comment**:
@@ -171,6 +252,7 @@
   - TODOs for acknowledged future improvements
   - "Why" decisions that aren't obvious from code
   - API usage that isn't self-documenting
+  - Selector chains: which URL/page each selector targets
 - **When NOT to comment**:
   - Obvious code
   - Restating function/variable names
@@ -181,7 +263,7 @@
 ## Code Cleanup & Maintenance
 - **Delete unused code immediately**: No commented-out blocks unless temporarily debugging
 - **Remove console.logs before committing**: Except debug logs controlled by config flag
-- **No commented-out alternatives**: Delete or choose one implementation
+- **No commented-out alternatives**: Delete or choose one implementation (exception: library alternatives with notes)
 - **Keep codebase minimal**: Question whether each line is necessary
 - **Consistent formatting**: Match existing indentation, spacing, brace style
 
@@ -190,9 +272,11 @@
   - Gate behind config flag
   - Include context: what's being logged and why
   - Use consistent prefix for filtering
+  - Support level parameter ('info', 'warning', 'error')
 - **Use `debugger;` during development**: Remove before committing
 - **Test edge cases**: Empty results, network failures, slow connections, malformed data
 - **Test in target environment**: Use browser-specific features appropriately
+- **Test across page types**: Verify selectors and logic work on all target URLs
 
 ## Performance Considerations
 - **Don't prematurely optimize**: Prioritize clarity over micro-optimizations
@@ -202,6 +286,7 @@
   - Cache frequently accessed values
   - Use appropriate data structures (Set for lookups, Map for key-value)
 - **Async operations**: Don't block unnecessarily, but don't over-parallelize either
+- **Throttle tab creation**: Add delays between opening multiple tabs to avoid overwhelming browser
 
 ## Data Transformation Patterns
 - **Immutable transformations**: Prefer `map`/`filter` over mutating arrays
@@ -227,6 +312,33 @@ Before committing, verify:
 8. ✓ Functions are small and focused
 9. ✓ Async operations handle errors
 10. ✓ Code would be understandable in 6 months
+11. ✓ Selectors are commented with target page types
+12. ✓ MutationObservers properly disconnect/reconnect
+13. ✓ Chrome API errors are checked with lastError
+14. ✓ Storage operations include metadata
 
-## Project-Specific Exceptions
-Document any project-specific deviations from these rules here with justification.
+## Project-Specific Patterns
+
+### LinkedIn Page Type Detection
+This extension handles multiple LinkedIn job page formats:
+- `/my-items/saved-jobs/` - Saved jobs list (Export feature)
+- `/jobs/search/` - Job search with two-panel layout
+- `/jobs/collections/` - Job collections with two-panel layout
+- `/jobs/view/` - Individual job post (standalone page)
+- `/jobs/search-results/` - Alternative search results layout
+
+Different page types require different selectors and rendering strategies. Comment each selector with its target page type(s).
+
+### Injected Content Management
+- Prefix all injected element IDs with `ext-` to avoid conflicts
+- Include inline styles in injected HTML to ensure consistent appearance
+- Use transition effects for smooth appearance (height: 0 → auto)
+- Clean up previous injections before inserting new content
+
+### Error Context in Messages
+Always include enough context in error messages for debugging:
+- Which script/function failed
+- What was being attempted
+- What state/data was involved
+
+Example: `"Job card #5 error: Invalid saved job link"` rather than `"Invalid link"`
