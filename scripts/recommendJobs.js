@@ -24,6 +24,7 @@ async function main() {
     if (['https://www.linkedin.com/preload/', 'about:blank'].includes(
         document.location.href,
     )) {
+        debug(`wrong \`document\` frame '${document.location.href}', skipping...`);
         return; // silently ignore wrong `document` frames
     }
 
@@ -129,14 +130,30 @@ function getIndexStart(isStartAtSelectedJob, topDivs) {
             // for '/search/', '/collections/'
             topDiv.classList.contains('jobs-search-results-list__list-item--active')
             // for '/search-results/'
-            || getComputedStyle(topDiv.parentElement.parentElement)
-                .backgroundColor.endsWith(", 0.1)")
+            || isSelectedDiv(topDiv.parentElement.parentElement)
         ) {
             return index;
         }
     }
     // no job card selected -> fall back to processing from the start
     return 0;
+}
+
+function isSelectedDiv(jobCardDiv) {
+    /*
+     * `getComputedStyle()` of pre-DarkReader background color
+     */
+    const cssVar = jobCardDiv.style.backgroundColor.match(/--[^)]+/)[0];
+    if (!cssVar) throw new Error("`cssVar` not found in job card div");
+    const elem = document.createElement('i');
+    elem.style.cssText = `position: absolute; visibility: hidden;
+pointer-events: none; color: var(${cssVar});`;
+    jobCardDiv.appendChild(elem);
+    const computedStyleColor = getComputedStyle(elem).color;
+    elem.remove();
+
+    // selected bg-color is rgb(...140, 0.1), not rgb(...255)
+    return computedStyleColor.endsWith(", 0.1)");
 }
 
 function getTopDivs() {

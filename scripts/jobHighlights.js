@@ -37,7 +37,7 @@ async function main() {
         return;
     }
 
-    sendStatusToPopup(`Done. Highlights shown`, '', 'highlights_done');
+    sendStatusToPopup(`Done. Highlights enabled`, '', 'highlights_done');
 }
 
 async function mainHighlights() {
